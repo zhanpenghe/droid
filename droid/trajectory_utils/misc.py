@@ -140,6 +140,8 @@ def calibrate_camera(
     obs_pointer=None,
     wait_for_controller=False,
     reset_robot=True,
+    pos_scale=0.1,
+    angle_scale=0.2,
 ):
     """Returns true if calibration was successful, otherwise returns False
     3rd Person Calibration Instructions: Press A when board in aligned with the camera from 1 foot away.
@@ -234,7 +236,11 @@ def calibrate_camera(
             if take_picture:
                 img = deepcopy(cam_obs["image"][full_cam_id])
                 pose = state["cartesian_position"].copy()
+                prev_count = len(calibrator._readings_dict[full_cam_id])
                 calibrator.add_sample(full_cam_id, img, pose)
+                new_count = len(calibrator._readings_dict[full_cam_id])
+                detected = new_count > prev_count
+                print(f"[Step {i}] Board {'detected' if detected else 'NOT detected'} — valid samples: {new_count}")
             cam_obs["image"][full_cam_id] = calibrator.augment_image(full_cam_id, cam_obs["image"][full_cam_id])
 
         # Update Obs Pointer #
@@ -242,7 +248,7 @@ def calibrate_camera(
             obs_pointer.update(cam_obs)
 
         # Move To Desired Next Pose #
-        calib_pose = calibration_traj(i * step_size, hand_camera=hand_camera)
+        calib_pose = calibration_traj(i * step_size, pos_scale=pos_scale, angle_scale=angle_scale, hand_camera=hand_camera)
         desired_pose = change_pose_frame(calib_pose, pose_origin)
         action = np.concatenate([desired_pose, [0]])
         env.update_robot(action, action_space="cartesian_position", blocking=False)
